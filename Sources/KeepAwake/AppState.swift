@@ -84,6 +84,12 @@ final class AppState: ObservableObject {
         if isKeepingAwake { stopKeepAwake() } else { startKeepAwake() }
     }
 
+    /// Recover from a shortcut conflict without restarting the running session.
+    func retryHotKey() {
+        guard started, !preparedToQuit, hotKeyError != nil else { return }
+        hotKeyError = hotKey.registerDefaultHotKey()
+    }
+
     private func startKeepAwake() {
         do {
             try power.startKeepingAwake()

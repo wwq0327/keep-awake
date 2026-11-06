@@ -197,6 +197,12 @@ struct PanelView: View {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.red)
                     }
+                    if model.hotKeyError != nil {
+                        Button(localized("重试快捷键", "Retry shortcut")) {
+                            model.retryHotKey()
+                        }
+                        .help(localized("冲突解除后重新注册，不会中断本次保持", "Register again after resolving the conflict, without interrupting this session"))
+                    }
                     Divider()
                 }
                 Text(localized("保持唤醒说明", "About Keep Awake")).font(.system(size: 13, weight: .semibold))

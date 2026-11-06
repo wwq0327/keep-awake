@@ -183,6 +183,63 @@ struct AppStateTests {
         #expect(!f.model.isKeepingAwake)
     }
 
+    @Test func hotkeyRetryRecoversWithoutRestartingSession() throws {
+        let f = try Fixture()
+        f.hotKey.error = "Shortcut in use"
+        f.model.start()
+        defer { f.model.prepareToQuit() }
+        f.model.toggleKeepAwake()
+        f.clock.seconds += 10
+        f.model.tick()
+
+        f.model.retryHotKey()
+        #expect(f.model.hotKeyError != nil)
+        #expect(f.hotKey.registrations == 2)
+        #expect(f.model.isKeepingAwake)
+        #expect(f.model.sessionSeconds == 10)
+
+        f.hotKey.error = nil
+        f.model.retryHotKey()
+        #expect(f.model.hotKeyError == nil)
+        #expect(f.hotKey.registrations == 3)
+        #expect(f.model.sessionSeconds == 10)
+        #expect(f.model.totalAwakeSeconds == 10)
+        #expect(f.power.starts == 1)
+        #expect(f.power.stops == 0)
+        f.model.retryHotKey() // Already registered: nothing to recover.
+        f.model.start()
+        #expect(f.hotKey.registrations == 3)
+
+        f.hotKey.onToggle?()
+        #expect(!f.model.isKeepingAwake)
+        #expect(f.power.stops == 1)
+        #expect(f.store.cumulativeAwakeSeconds == 10)
+    }
+
+    @Test func hotkeyRetryWhileOffAndAfterQuit() throws {
+        let f = try Fixture()
+        f.hotKey.error = "Shortcut in use"
+        f.model.retryHotKey()
+        #expect(f.hotKey.registrations == 0)
+        f.model.start()
+        f.hotKey.error = nil
+        f.model.retryHotKey()
+        #expect(f.model.hotKeyError == nil)
+        #expect(!f.model.isKeepingAwake)
+        #expect(f.power.starts == 0)
+        #expect(!f.model.hasSession)
+
+        let quitting = try Fixture()
+        quitting.hotKey.error = "Shortcut still in use"
+        quitting.model.start()
+        quitting.model.prepareToQuit()
+        quitting.hotKey.error = nil
+        quitting.model.retryHotKey()
+        #expect(quitting.hotKey.registrations == 1)
+        #expect(quitting.model.hotKeyError != nil)
+        f.model.prepareToQuit()
+    }
+
     @Test func quitSavesEvenIfReleaseFails() throws {
         let f = try Fixture()
         f.model.toggleKeepAwake()
