@@ -112,11 +112,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (`12:34` = hours:minutes) so long runs are visible at a glance.
     private func refreshTitle() {
         guard let button = statusItem.button else { return }
-        if model.isKeepingAwake {
-            button.title = " \(AwakeDuration.menuBar(model.sessionSeconds))"
-        } else if button.title.isEmpty == false {
-            button.title = ""
-        }
+        let title = model.isKeepingAwake ? " \(AwakeDuration.menuBar(model.sessionSeconds))" : ""
+        if button.title != title { button.title = title }
     }
 
     // MARK: Popover

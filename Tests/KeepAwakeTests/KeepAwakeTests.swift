@@ -43,6 +43,15 @@ private final class TestClock {
     var seconds: TimeInterval = 100
 }
 
+private final class TestIdleTime {
+    var seconds: TimeInterval = 0
+    var reads = 0
+    func read() -> TimeInterval {
+        reads += 1
+        return seconds
+    }
+}
+
 private final class Scratch {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("keep-awake-tests-\(UUID().uuidString)", isDirectory: true)
@@ -60,6 +69,7 @@ private struct Fixture {
     let power = FakePower()
     let hotKey = FakeHotKey()
     let clock = TestClock()
+    let idle = TestIdleTime()
     let store: StatsStore
     let model: AppState
 
@@ -68,13 +78,59 @@ private struct Fixture {
         self.scratch = scratch
         store = StatsStore(fileURL: scratch.statsURL)
         let clock = self.clock
-        model = AppState(power: power, stats: store, hotKey: hotKey, clock: { clock.seconds })
+        let idle = self.idle
+        model = AppState(power: power, stats: store, hotKey: hotKey,
+                         clock: { clock.seconds }, idleSeconds: { idle.read() })
     }
 }
 
 @Suite(.serialized)
 @MainActor
 struct AppStateTests {
+    @Test func activityBoundaryIsSampledOncePerTick() throws {
+        let f = try Fixture()
+        var states: [DisplayState] = []
+        f.model.onStateChange = { states.append($0) }
+        f.model.start()
+        defer { f.model.prepareToQuit() }
+        #expect(states == [.active]) // The menu icon needs an initial callback.
+        var reads = f.idle.reads
+        #expect(f.model.displayState == .active)
+        #expect(f.model.displayState == .active)
+        #expect(f.idle.reads == reads)
+
+        f.idle.seconds = 119.99
+        f.model.tick()
+        #expect(f.idle.reads == reads + 1)
+        #expect(f.model.displayState == .active)
+        #expect(states == [.active])
+
+        reads = f.idle.reads
+        f.idle.seconds = 120
+        f.model.tick()
+        #expect(f.idle.reads == reads + 1)
+        #expect(f.model.displayState == .idle)
+        #expect(states == [.active, .idle])
+        for unavailable in [-1.0, Double.nan, .infinity] {
+            f.idle.seconds = unavailable
+            f.model.tick()
+            #expect(f.model.displayState == .idle)
+        }
+
+        reads = f.idle.reads
+        f.model.toggleKeepAwake()
+        f.clock.seconds += 2
+        f.model.tick()
+        #expect(f.model.displayState == .keepingAwake)
+        #expect(f.model.sessionSeconds == 2)
+        #expect(f.idle.reads == reads)
+        f.idle.seconds = 0
+        f.model.toggleKeepAwake()
+        #expect(f.idle.reads == reads + 1)
+        #expect(f.model.displayState == .active)
+        #expect(states == [.active, .idle, .keepingAwake, .active])
+    }
+
     @Test func startsOffEvenWithHistory() throws {
         let f = try Fixture()
         try f.store.commit(delta: 125)
@@ -84,6 +140,27 @@ struct AppStateTests {
         #expect(!relaunched.isKeepingAwake)
         #expect(relaunched.totalAwakeSeconds == 125)
         #expect(f.power.starts == 0)
+    }
+
+    @Test func unsupportedHistoryStillAllowsKeepingAwakeAndRendering() throws {
+        let scratch = try Scratch()
+        let original = try JSONEncoder().encode(StatsSnapshot(cumulativeAwakeSeconds: 1e100, updatedAt: Date()))
+        try original.write(to: scratch.statsURL)
+        let power = FakePower()
+        let clock = TestClock()
+        let model = AppState(power: power, stats: StatsStore(fileURL: scratch.statsURL),
+                             hotKey: FakeHotKey(), clock: { clock.seconds }, idleSeconds: { 0 })
+        #expect(model.statsError != nil)
+        model.toggleKeepAwake()
+        clock.seconds += 12.5
+        model.tick()
+        #expect(model.isKeepingAwake)
+        #expect(model.totalAwakeSeconds == 12.5)
+        let png = try PanelSnapshot.png(model: model)
+        #expect(!png.isEmpty)
+        model.prepareToQuit()
+        #expect(!power.active)
+        #expect(try Data(contentsOf: scratch.statsURL) == original)
     }
 
     @Test func failedStartIsVisibleAndDoesNotEnable() throws {
@@ -291,8 +368,8 @@ struct AppStateTests {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let output = root.appendingPathComponent(".build/qa", isDirectory: true)
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-        func render(_ name: String, appearance: NSAppearance.Name = .aqua) throws {
-            let png = try PanelSnapshot.png(model: f.model, appearance: appearance)
+        func render(_ name: String, appearance: NSAppearance.Name = .aqua, showDetails: Bool = false) throws {
+            let png = try PanelSnapshot.png(model: f.model, appearance: appearance, showDetails: showDetails)
             try png.write(to: output.appendingPathComponent("\(name).png"))
         }
         try render("panel-off")
@@ -302,6 +379,7 @@ struct AppStateTests {
         f.model.tick()
         try render("panel-on")
         try render("panel-on-dark", appearance: .darkAqua)
+        try render("panel-details", showDetails: true)
         f.model.toggleKeepAwake()
         try render("panel-last-session")
         f.model.toggleKeepAwake()
@@ -316,6 +394,12 @@ struct AppStateTests {
         #expect(f.model.errors.count == 3)
         try render("panel-errors")
         try render("panel-errors-dark", appearance: .darkAqua)
+        try render("panel-details-errors", showDetails: true)
+        try render("panel-details-errors-dark", appearance: .darkAqua, showDetails: true)
+        f.hotKey.error = nil
+        f.model.retryHotKey()
+        #expect(f.model.errors.count == 2)
+        try render("panel-details-retried", showDetails: true)
         f.power.stopFails = false
         f.model.prepareToQuit()
 

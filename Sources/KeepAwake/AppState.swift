@@ -14,6 +14,7 @@ final class AppState: ObservableObject {
     @Published private(set) var powerError: String?
     @Published private(set) var hotKeyError: String?
     @Published private(set) var statsError: String?
+    @Published private(set) var displayState: DisplayState = .idle
 
     var onStateChange: ((DisplayState) -> Void)?
     var onError: (() -> Void)?
@@ -22,6 +23,7 @@ final class AppState: ObservableObject {
     private let stats: StatsStore
     private let hotKey: any HotKeyRegistering
     private let clock: () -> TimeInterval
+    private let idleSeconds: () -> TimeInterval
     private let launchTime: TimeInterval
     private var sessionStart: TimeInterval?
     private var lastSessionSeconds: TimeInterval = 0
@@ -35,17 +37,24 @@ final class AppState: ObservableObject {
         power: any PowerControlling = PowerManager(),
         stats: StatsStore = StatsStore(),
         hotKey: any HotKeyRegistering = HotKeyManager(),
-        clock: @escaping () -> TimeInterval = AwakeClock.seconds
+        clock: @escaping () -> TimeInterval = AwakeClock.seconds,
+        idleSeconds: @escaping () -> TimeInterval = {
+            CGEventSource.secondsSinceLastEventType(
+                .combinedSessionState, eventType: CGEventType(rawValue: 0xFFFFFFFF) ?? .null
+            )
+        }
     ) {
         self.power = power
         self.stats = stats
         self.hotKey = hotKey
         self.clock = clock
+        self.idleSeconds = idleSeconds
         let time = clock()
         now = time
         launchTime = time
         lastSnapshotTime = time
         statsError = stats.loadError
+        displayState = sampledDisplayState()
         hotKey.onToggle = { [weak self] in self?.toggleKeepAwake() }
     }
 
@@ -56,6 +65,9 @@ final class AppState: ObservableObject {
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
+        // Allow small scheduling adjustments to coalesce wakeups. Elapsed
+        // time and the save interval still use the monotonic clock.
+        timer.tolerance = 0.1
         // Common modes also tick while the user interacts with the popover.
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
@@ -136,13 +148,10 @@ final class AppState: ObservableObject {
     var errors: [String] { [powerError, hotKeyError, statsError].compactMap { $0 } }
     var hasSession: Bool { sessionStart != nil || lastSessionSeconds > 0 }
 
-    var displayState: DisplayState {
+    private func sampledDisplayState() -> DisplayState {
         if isKeepingAwake { return .keepingAwake }
-        let anyInput = CGEventType(rawValue: 0xFFFFFFFF)
-        let idle = CGEventSource.secondsSinceLastEventType(
-            .combinedSessionState, eventType: anyInput ?? .null
-        )
-        return idle < 120 ? .active : .idle
+        let idle = idleSeconds()
+        return idle >= 0 && idle < 120 ? .active : .idle
     }
 
     var uptimeSeconds: TimeInterval { max(0, now - launchTime) }
@@ -159,7 +168,7 @@ final class AppState: ObservableObject {
     /// Internal for deterministic regression tests; production uses the timer.
     func tick() {
         now = clock()
-        if displayState != lastNotifiedState { notifyStateChange() }
+        notifyStateChange()
         // Check elapsed time, not a particular wall-clock second. Failed saves
         // retry after 60 awake seconds, including while the switch is OFF.
         if (isKeepingAwake || stats.hasUnsavedChanges), now - lastSnapshotTime >= 60 {
@@ -181,7 +190,9 @@ final class AppState: ObservableObject {
     }
 
     private func notifyStateChange() {
-        let state = displayState
+        let state = sampledDisplayState()
+        if displayState != state { displayState = state }
+        guard state != lastNotifiedState else { return }
         lastNotifiedState = state
         onStateChange?(state)
     }

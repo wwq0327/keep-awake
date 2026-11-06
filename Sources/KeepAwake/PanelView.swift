@@ -188,7 +188,12 @@ struct PanelView: View {
         }
     }
 
-    private var details: some View {
+    var detailsSize: NSSize {
+        NSSize(width: 268, height: model.errors.isEmpty ? 244 : 360)
+    }
+
+    // Internal so the native snapshot hook can also verify alert actions.
+    var details: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 if !model.errors.isEmpty {
@@ -216,7 +221,7 @@ struct PanelView: View {
             .padding(16)
         }
         .scrollIndicators(.visible)
-        .frame(width: 268, height: model.errors.isEmpty ? 244 : 360)
+        .frame(width: detailsSize.width, height: detailsSize.height)
     }
 
 }

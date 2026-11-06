@@ -5,17 +5,22 @@ import SwiftUI
 /// included. ImageRenderer alone omits some AppKit-backed SwiftUI content.
 @MainActor
 enum PanelSnapshot {
-    static func png(model: AppState, appearance: NSAppearance.Name = .aqua) throws -> Data {
+    static func png(model: AppState, appearance: NSAppearance.Name = .aqua,
+                    showDetails: Bool = false) throws -> Data {
         _ = NSApplication.shared
-        let view = NSHostingView(rootView: PanelView(model: model)
+        let panel = PanelView(model: model)
+        let size = showDetails ? panel.detailsSize : PanelView.size
+        let view = NSHostingView(rootView: Group {
+            if showDetails { panel.details } else { panel }
+        }
             .background(Color(nsColor: .windowBackgroundColor)))
         let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: PanelView.size),
+            contentRect: NSRect(origin: .zero, size: size),
             styleMask: .borderless, backing: .buffered, defer: false
         )
         window.appearance = NSAppearance(named: appearance)
         window.contentView = view
-        view.frame = NSRect(origin: .zero, size: PanelView.size)
+        view.frame = NSRect(origin: .zero, size: size)
         view.layoutSubtreeIfNeeded()
         guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
             throw CocoaError(.fileWriteUnknown)
