@@ -2,7 +2,9 @@
 
 一个 macOS 菜单栏小工具，用来防止电脑因长时间没有键鼠操作而进入闲置休眠。开启后仍可锁屏和熄屏；手动睡眠、合盖或低电量等情况仍可能使电脑休眠。
 
-![Keep Awake 面板](design/2026-11-06/implemented-circular-on.png)
+| 浅色模式 | 深色模式 |
+| --- | --- |
+| ![Keep Awake 浅色面板](design/2026-11-06/implemented-circular-on.png) | ![Keep Awake 深色面板](design/2026-11-06/implemented-circular-dark.png) |
 
 ## 功能
 
