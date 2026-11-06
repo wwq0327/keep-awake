@@ -281,6 +281,48 @@ struct AppStateTests {
 }
 
 struct PersistenceAndLockTests {
+    @Test func oversizedHistoryIsRejectedAndPreserved() throws {
+        let scratch = try Scratch()
+        let original = try JSONEncoder().encode(StatsSnapshot(cumulativeAwakeSeconds: 1e100, updatedAt: Date()))
+        try original.write(to: scratch.statsURL)
+        let store = StatsStore(fileURL: scratch.statsURL)
+        #expect(store.loadError != nil)
+        #expect(store.cumulativeAwakeSeconds == 0)
+        #expect(throws: (any Error).self) { try store.commit(delta: 12.5) }
+        #expect(store.cumulativeAwakeSeconds == 12.5)
+        #expect(try Data(contentsOf: scratch.statsURL) == original)
+    }
+
+    @Test func invalidIncrementsAndOverflowPreserveStatistics() throws {
+        let scratch = try Scratch()
+        let store = StatsStore(fileURL: scratch.statsURL)
+        try store.commit(delta: 1.25)
+        let original = try Data(contentsOf: scratch.statsURL)
+        for delta in [-1.0, .nan, .infinity, 1e100] {
+            #expect(throws: (any Error).self) { try store.commit(delta: delta) }
+            #expect(store.cumulativeAwakeSeconds == 1.25)
+            #expect(try Data(contentsOf: scratch.statsURL) == original)
+        }
+        let largest = Double(Int64.max).nextDown
+        try store.commit(delta: largest - store.cumulativeAwakeSeconds)
+        let beforeOverflow = try Data(contentsOf: scratch.statsURL)
+        #expect(throws: (any Error).self) { try store.commit(delta: 4096) }
+        #expect(store.cumulativeAwakeSeconds == largest)
+        #expect(try Data(contentsOf: scratch.statsURL) == beforeOverflow)
+    }
+
+    @Test func invalidSnapshotsDoNotOverwriteValidFile() throws {
+        let scratch = try Scratch()
+        let store = StatsStore(fileURL: scratch.statsURL)
+        try store.commit(delta: 42.75)
+        let original = try Data(contentsOf: scratch.statsURL)
+        for total in [-1.0, .nan, .infinity, 1e100] {
+            #expect(throws: (any Error).self) { try store.persistSnapshot(totalIncludingSession: total) }
+            #expect(try Data(contentsOf: scratch.statsURL) == original)
+            #expect(store.cumulativeAwakeSeconds == 42.75)
+        }
+    }
+
     @Test func snapshotSurvivesRestartWithoutRestoringSwitch() throws {
         let scratch = try Scratch()
         let store = StatsStore(fileURL: scratch.statsURL)
@@ -343,4 +385,19 @@ struct PersistenceAndLockTests {
     #expect(!AppLanguage.isChinese(["en-US", "zh-Hans"]))
     #expect(!AppLanguage.isChinese(["fr-FR"]))
     #expect(!AppLanguage.isChinese([]))
+}
+
+@Test func durationFormattingHandlesUnsafeValuesAndLargeHours() {
+    for invalid in [-1.0, Double.nan, .infinity, 1e100, Double(Int64.max)] {
+        #expect(!AwakeDuration.isSupported(invalid))
+        #expect(AwakeDuration.full(invalid) == "—")
+        #expect(AwakeDuration.menuBar(invalid) == "—")
+    }
+    #expect(AwakeDuration.isSupported(Double(Int64.max).nextDown))
+    #expect(AwakeDuration.full(3661.99) == "01:01:01")
+    #expect(AwakeDuration.full(0) == "00:00:00")
+    #expect(AwakeDuration.full(3_000_000_000 * 3600.0) == "3000000000:00:00")
+    #expect(AwakeDuration.menuBar(3_000_000_000 * 3600.0) == "3000000000:00")
+    #expect(AwakeDuration.menuBar(3599.99) == "0:59")
+    #expect(AwakeDuration.menuBar(3600) == "1:00")
 }

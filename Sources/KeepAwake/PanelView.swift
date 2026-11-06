@@ -93,13 +93,13 @@ struct PanelView: View {
         VStack(spacing: 13) {
             statRow(
                 label: model.isKeepingAwake ? localized("本次保持", "Current session") : localized("上次保持", "Last session"),
-                value: model.hasSession ? durationText(model.sessionSeconds) : "—"
+                value: model.hasSession ? AwakeDuration.full(model.sessionSeconds) : "—"
             )
             statRow(
                 label: localized("累计保持", "Total awake"),
-                value: durationText(model.totalAwakeSeconds)
+                value: AwakeDuration.full(model.totalAwakeSeconds)
             )
-            statRow(label: localized("程序已运行", "App uptime"), value: durationText(model.uptimeSeconds))
+            statRow(label: localized("程序已运行", "App uptime"), value: AwakeDuration.full(model.uptimeSeconds))
         }
         .frame(height: 74)
         .padding(.vertical, 14)
@@ -213,17 +213,6 @@ struct PanelView: View {
         .frame(width: 268, height: model.errors.isEmpty ? 244 : 360)
     }
 
-    // MARK: Helpers
-
-    private func durationText(_ seconds: TimeInterval) -> String {
-        let total = Int(seconds)
-        return String(
-            format: "%02d:%02d:%02d",
-            total / 3600,
-            (total % 3600) / 60,
-            total % 60
-        )
-    }
 }
 
 /// Keep the chosen orange state visible even when the popover is inactive.

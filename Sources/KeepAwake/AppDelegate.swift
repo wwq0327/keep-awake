@@ -113,10 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func refreshTitle() {
         guard let button = statusItem.button else { return }
         if model.isKeepingAwake {
-            let seconds = Int(model.sessionSeconds)
-            let hours = seconds / 3600
-            let minutes = (seconds % 3600) / 60
-            button.title = " \(hours):\(String(format: "%02d", minutes))"
+            button.title = " \(AwakeDuration.menuBar(model.sessionSeconds))"
         } else if button.title.isEmpty == false {
             button.title = ""
         }

@@ -23,8 +23,7 @@ final class StatsStore {
         do {
             let data = try Data(contentsOf: fileURL)
             let snapshot = try JSONDecoder().decode(StatsSnapshot.self, from: data)
-            guard snapshot.cumulativeAwakeSeconds.isFinite,
-                  snapshot.cumulativeAwakeSeconds >= 0 else {
+            guard AwakeDuration.isSupported(snapshot.cumulativeAwakeSeconds) else {
                 throw CocoaError(.coderReadCorrupt)
             }
             cumulativeAwakeSeconds = snapshot.cumulativeAwakeSeconds
@@ -39,21 +38,30 @@ final class StatsStore {
     /// Keep the increment in memory even on write failure, so retrying the save
     /// never adds the same session twice.
     func commit(delta: Double) throws {
-        guard delta.isFinite, delta >= 0 else { return }
-        cumulativeAwakeSeconds += delta
+        let total = cumulativeAwakeSeconds + delta
+        guard AwakeDuration.isSupported(delta), AwakeDuration.isSupported(total) else {
+            throw StatsError(message: localized(
+                "统计时长超出可支持范围，已有累计记录已保留。",
+                "Duration is outside the supported range. Existing statistics are preserved."
+            ))
+        }
+        cumulativeAwakeSeconds = total
         try persistSnapshot(totalIncludingSession: cumulativeAwakeSeconds)
     }
 
     func persistSnapshot(totalIncludingSession: Double) throws {
+        guard AwakeDuration.isSupported(totalIncludingSession) else {
+            throw StatsError(message: localized(
+                "统计时长超出可支持范围，已有累计记录已保留。",
+                "Duration is outside the supported range. Existing statistics are preserved."
+            ))
+        }
         hasUnsavedChanges = true
         // Never replace unreadable/corrupt historical data with a zero base.
         if let loadError {
             throw StatsError(message: loadError)
         }
         do {
-            guard totalIncludingSession.isFinite, totalIncludingSession >= 0 else {
-                throw CocoaError(.coderInvalidValue)
-            }
             let data = try JSONEncoder().encode(StatsSnapshot(
                 cumulativeAwakeSeconds: totalIncludingSession, updatedAt: Date()
             ))
