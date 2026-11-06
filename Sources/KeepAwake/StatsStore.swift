@@ -32,7 +32,7 @@ final class StatsStore {
             && error.code == NSFileReadNoSuchFileError {
             // A new installation has no statistics yet.
         } catch {
-            loadError = "累计记录无法读取，原文件已保留，本次仍可计时。请检查 stats.json：\(error.localizedDescription)"
+            loadError = localized("累计记录无法读取，原文件已保留，本次仍可计时。请检查 stats.json：\(error.localizedDescription)", "Could not read total time. The original file is preserved; this session can still be timed. Check stats.json: \(error.localizedDescription)")
         }
     }
 
@@ -63,7 +63,7 @@ final class StatsStore {
             try data.write(to: fileURL, options: .atomic)
             hasUnsavedChanges = false
         } catch {
-            throw StatsError(message: "统计未能保存，稍后会重试；退出可能丢失未保存时长。\(error.localizedDescription)")
+            throw StatsError(message: localized("统计未能保存，稍后会重试；退出可能丢失未保存时长。\(error.localizedDescription)", "Could not save statistics; retrying later. Quitting may lose unsaved time. \(error.localizedDescription)"))
         }
     }
 }

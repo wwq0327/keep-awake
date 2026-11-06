@@ -67,7 +67,7 @@ final class HotKeyManager: HotKeyRegistering {
             1, &eventType, userData, &eventHandlerRef
         )
         if handlerStatus != noErr {
-            return "快捷键初始化失败（\(handlerStatus)），请使用面板开关。"
+            return localized("快捷键初始化失败（\(handlerStatus)），请使用面板开关。", "Could not initialize the shortcut (\(handlerStatus)). Use the panel switch.")
         }
 
         let registerStatus = RegisterEventHotKey(
@@ -75,7 +75,7 @@ final class HotKeyManager: HotKeyRegistering {
         )
         if registerStatus != noErr {
             unregister()
-            return "快捷键不可用，可能已被占用（\(registerStatus)），请使用面板开关。"
+            return localized("快捷键不可用，可能已被占用（\(registerStatus)），请使用面板开关。", "Shortcut unavailable; it may already be in use (\(registerStatus)). Use the panel switch.")
         }
         return nil
     }

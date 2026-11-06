@@ -4,11 +4,11 @@
 
 ## English
 
-Keep Awake is a macOS menu bar utility that prevents idle system sleep while allowing the screen to turn off and the Mac to lock. Manual sleep, closing the lid, low battery, and other forced sleep conditions can still put the Mac to sleep. The app interface is currently in Chinese.
+Keep Awake is a macOS menu bar utility that prevents idle system sleep while allowing the screen to turn off and the Mac to lock. Manual sleep, closing the lid, low battery, and other forced sleep conditions can still put the Mac to sleep. The interface follows the system language (Chinese or English, with English as the fallback).
 
 | Light mode | Dark mode |
 | --- | --- |
-| ![Keep Awake panel in light mode](design/2026-11-06/implemented-circular-on.png) | ![Keep Awake panel in dark mode](design/2026-11-06/implemented-circular-dark.png) |
+| ![Keep Awake panel in light mode](docs/screenshots/en-light.png) | ![Keep Awake panel in dark mode](docs/screenshots/en-dark.png) |
 
 ### Features
 
@@ -69,11 +69,11 @@ Built with Swift, SwiftUI, AppKit, IOKit, and Carbon. An IOKit power assertion p
 
 ## 简体中文
 
-一个 macOS 菜单栏小工具，用来防止电脑因长时间没有键鼠操作而进入闲置休眠。开启后仍可锁屏和熄屏；手动睡眠、合盖或低电量等情况仍可能使电脑休眠。
+一个 macOS 菜单栏小工具，用来防止电脑因长时间没有键鼠操作而进入闲置休眠。开启后仍可锁屏和熄屏；手动睡眠、合盖或低电量等情况仍可能使电脑休眠。界面跟随系统语言显示中文或英文，其他语言默认显示英文。
 
 | 浅色模式 | 深色模式 |
 | --- | --- |
-| ![Keep Awake 浅色面板](design/2026-11-06/implemented-circular-on.png) | ![Keep Awake 深色面板](design/2026-11-06/implemented-circular-dark.png) |
+| ![Keep Awake 浅色面板](docs/screenshots/zh-light.png) | ![Keep Awake 深色面板](docs/screenshots/zh-dark.png) |
 
 ### 功能
 

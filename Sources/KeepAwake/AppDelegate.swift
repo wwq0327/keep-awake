@@ -6,7 +6,10 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
-    private let model = AppState()
+    private let model = CommandLine.arguments.contains("--render-preview")
+        ? AppState(stats: StatsStore(fileURL: FileManager.default.temporaryDirectory
+            .appendingPathComponent("keep-awake-preview-\(UUID().uuidString).json")))
+        : AppState()
     private let popover = NSPopover()
     private var cancellables: Set<AnyCancellable> = []
 
@@ -85,9 +88,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.prepareToQuit()
         if let error = model.statsError {
             let alert = NSAlert()
-            alert.messageText = "统计尚未保存"
+            alert.messageText = localized("统计尚未保存", "Statistics not saved")
             alert.informativeText = error
-            alert.addButton(withTitle: "退出")
+            alert.addButton(withTitle: localized("退出", "Quit"))
             alert.runModal()
         }
         return .terminateNow
@@ -98,10 +101,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func renderIcon(_ state: DisplayState) {
         statusItem.button?.image = StatusIcon.image(for: state)
         statusItem.button?.toolTip = state == .keepingAwake
-            ? "防止闲置休眠已开启；允许锁屏和熄屏"
-            : "防休眠已关闭；跟随系统设置"
+            ? localized("防止闲置休眠已开启；允许锁屏和熄屏", "Idle sleep prevention on; lock and display sleep allowed")
+            : localized("防休眠已关闭；跟随系统设置", "Sleep prevention off; using system settings")
         statusItem.button?.setAccessibilityLabel(state == .keepingAwake
-            ? "Keep Awake，保持唤醒中" : "Keep Awake，防休眠已关闭")
+            ? localized("Keep Awake，保持唤醒中", "Keep Awake, keeping awake") : localized("Keep Awake，防休眠已关闭", "Keep Awake, sleep prevention off"))
         refreshTitle()
     }
 
@@ -138,7 +141,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Debug helper used by `--render-preview`: renders PanelView to a PNG.
     private func renderPreview(path: String) throws {
-        let png = try PanelSnapshot.png(model: model)
+        let appearance: NSAppearance.Name = ProcessInfo.processInfo.environment["KEEP_AWAKE_PREVIEW_DARK"] == "1" ? .darkAqua : .aqua
+        let png = try PanelSnapshot.png(model: model, appearance: appearance)
         try png.write(to: URL(fileURLWithPath: path))
         print("DEBUG renderPreview wrote \(path)")
         fflush(stdout)

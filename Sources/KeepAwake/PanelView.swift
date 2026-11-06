@@ -50,10 +50,10 @@ struct PanelView: View {
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .strikethrough(model.hotKeyError != nil)
-                .help(model.hotKeyError ?? "切换保持唤醒")
+                .help(model.hotKeyError ?? localized("切换保持唤醒", "Toggle keep awake"))
                 .accessibilityLabel(model.hotKeyError == nil
-                    ? "快捷键：Control、Option、Command、K"
-                    : "快捷键不可用，使用保持唤醒开关")
+                    ? localized("快捷键：Control、Option、Command、K", "Shortcut: Control, Option, Command, K")
+                    : localized("快捷键不可用，使用保持唤醒开关", "Shortcut unavailable; use the switch"))
                 .padding(.horizontal, 7)
                 .padding(.vertical, 4)
                 .background(
@@ -66,15 +66,15 @@ struct PanelView: View {
     private var statusControl: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(model.isKeepingAwake ? "保持唤醒中" : "跟随系统休眠")
+                Text(model.isKeepingAwake ? localized("保持唤醒中", "Keeping Awake") : localized("跟随系统休眠", "System Sleep"))
                     .font(.system(size: 20, weight: .semibold))
                     .lineLimit(1)
-                Text("允许锁屏和熄屏")
+                Text(localized("允许锁屏和熄屏", "Lock and display sleep allowed"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            Toggle("保持唤醒", isOn: Binding(
+            Toggle(localized("保持唤醒", "Keep Awake"), isOn: Binding(
                 get: { model.isKeepingAwake },
                 set: { enabled in
                     if enabled != model.isKeepingAwake { model.toggleKeepAwake() }
@@ -82,8 +82,8 @@ struct PanelView: View {
             ))
             .toggleStyle(AwakeSwitchStyle())
             .labelsHidden()
-            .help(model.isKeepingAwake ? "停止保持唤醒" : "开始保持唤醒")
-            .accessibilityHint("只防止闲置休眠，允许锁屏和熄屏")
+            .help(model.isKeepingAwake ? localized("停止保持唤醒", "Stop keeping awake") : localized("开始保持唤醒", "Start keeping awake"))
+            .accessibilityHint(localized("只防止闲置休眠，允许锁屏和熄屏", "Prevents idle sleep; allows lock and display sleep"))
         }
     }
 
@@ -92,14 +92,14 @@ struct PanelView: View {
     private var stats: some View {
         VStack(spacing: 13) {
             statRow(
-                label: model.isKeepingAwake ? "本次保持" : "上次保持",
+                label: model.isKeepingAwake ? localized("本次保持", "Current session") : localized("上次保持", "Last session"),
                 value: model.hasSession ? durationText(model.sessionSeconds) : "—"
             )
             statRow(
-                label: "累计保持",
+                label: localized("累计保持", "Total awake"),
                 value: durationText(model.totalAwakeSeconds)
             )
-            statRow(label: "程序已运行", value: durationText(model.uptimeSeconds))
+            statRow(label: localized("程序已运行", "App uptime"), value: durationText(model.uptimeSeconds))
         }
         .frame(height: 74)
         .padding(.vertical, 14)
@@ -128,9 +128,9 @@ struct PanelView: View {
         Group {
             if model.errors.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("手动睡眠、合盖和低电量仍可休眠")
+                    Text(localized("手动睡眠、合盖和低电量仍可休眠", "Manual sleep, lid closure and low battery can still cause sleep"))
                     if !model.isKeepingAwake {
-                        Text("绿色仅表示近期有操作")
+                        Text(localized("绿色仅表示近期有操作", "Green only indicates recent activity"))
                     }
                 }
                 .font(.system(size: 10))
@@ -151,7 +151,7 @@ struct PanelView: View {
                     }
                     .scrollIndicators(.visible)
                     .frame(height: 32)
-                    Button("\(model.errors.count) 项提示 · 查看全部") {
+                    Button(localized("\(model.errors.count) 项提示 · 查看全部", "\(model.errors.count) alerts · View all")) {
                         showsDetails = true
                     }
                         .buttonStyle(.plain)
@@ -169,9 +169,9 @@ struct PanelView: View {
         HStack(alignment: .top, spacing: 8) {
             feedback
             VStack(spacing: 9) {
-                Button("退出") { NSApp.terminate(nil) }
+                Button(localized("退出", "Quit")) { NSApp.terminate(nil) }
                     .font(.system(size: 11))
-                    .help("退出并解除本工具的防休眠限制")
+                    .help(localized("退出并解除本工具的防休眠限制", "Quit and release this app’s sleep prevention"))
                 Button {
                     showsDetails.toggle()
                 } label: {
@@ -180,7 +180,7 @@ struct PanelView: View {
                         .frame(width: 24, height: 20)
                         .contentShape(Rectangle())
                 }
-                .accessibilityLabel(model.errors.isEmpty ? "保持唤醒说明" : "运行提示与保持唤醒说明")
+                .accessibilityLabel(model.errors.isEmpty ? localized("保持唤醒说明", "About Keep Awake") : localized("运行提示与保持唤醒说明", "Alerts and about Keep Awake"))
                 .popover(isPresented: $showsDetails) { details }
             }
             .buttonStyle(.plain)
@@ -192,17 +192,17 @@ struct PanelView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 if !model.errors.isEmpty {
-                    Text("运行提示").font(.system(size: 13, weight: .semibold))
+                    Text(localized("运行提示", "Alerts")).font(.system(size: 13, weight: .semibold))
                     ForEach(Array(model.errors.enumerated()), id: \.offset) { _, error in
                         Label(error, systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.red)
                     }
                     Divider()
                 }
-                Text("保持唤醒说明").font(.system(size: 13, weight: .semibold))
-                Text("开启后防止因没有键鼠操作而触发的系统闲置休眠，允许锁屏和熄屏。手动睡眠、合盖和低电量仍可休眠。")
-                Text("绿色仅表示最近 120 秒有键鼠操作，防休眠仍未开启；灰色表示闲置。")
-                Text("保持时长不计系统休眠时间。停止或退出只解除本工具的防休眠限制。")
+                Text(localized("保持唤醒说明", "About Keep Awake")).font(.system(size: 13, weight: .semibold))
+                Text(localized("开启后防止因没有键鼠操作而触发的系统闲置休眠，允许锁屏和熄屏。手动睡眠、合盖和低电量仍可休眠。", "Prevents idle system sleep while allowing lock and display sleep. Manual sleep, lid closure and low battery can still cause sleep."))
+                Text(localized("绿色仅表示最近 120 秒有键鼠操作，防休眠仍未开启；灰色表示闲置。", "Green means input in the last 120 seconds, not sleep prevention. Gray means idle."))
+                Text(localized("保持时长不计系统休眠时间。停止或退出只解除本工具的防休眠限制。", "Awake time excludes system sleep. Stopping or quitting only releases this app’s sleep prevention."))
             }
             .font(.system(size: 11))
             .fixedSize(horizontal: false, vertical: true)

@@ -336,3 +336,11 @@ struct PersistenceAndLockTests {
         #expect(throws: (any Error).self) { _ = try SingleInstanceLock(fileURL: path) }
     }
 }
+
+@Test func languageFollowsFirstSystemPreference() {
+    #expect(AppLanguage.isChinese(["zh-Hans-CN", "en-US"]))
+    #expect(AppLanguage.isChinese(["zh-Hant-TW"]))
+    #expect(!AppLanguage.isChinese(["en-US", "zh-Hans"]))
+    #expect(!AppLanguage.isChinese(["fr-FR"]))
+    #expect(!AppLanguage.isChinese([]))
+}

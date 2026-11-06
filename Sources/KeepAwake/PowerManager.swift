@@ -11,7 +11,7 @@ struct PowerError: LocalizedError {
     let code: IOReturn
 
     var errorDescription: String? {
-        "\(action)失败（\(String(format: "0x%08x", code))），请重试。"
+        localized("\(action)失败（\(String(format: "0x%08x", code))），请重试。", "Could not \(action) (\(String(format: "0x%08x", code))). Please retry.")
     }
 }
 
@@ -38,7 +38,7 @@ final class PowerManager: PowerControlling {
             &assertionID
         )
         guard result == kIOReturnSuccess else {
-            throw PowerError(action: "开启防休眠", code: result)
+            throw PowerError(action: localized("开启防休眠", "enable sleep prevention"), code: result)
         }
         self.assertionID = assertionID
         isKeepingAwake = true
@@ -48,7 +48,7 @@ final class PowerManager: PowerControlling {
         guard isKeepingAwake else { return }
         let result = IOPMAssertionRelease(assertionID)
         guard result == kIOReturnSuccess else {
-            throw PowerError(action: "关闭防休眠", code: result)
+            throw PowerError(action: localized("关闭防休眠", "disable sleep prevention"), code: result)
         }
         assertionID = 0
         isKeepingAwake = false
