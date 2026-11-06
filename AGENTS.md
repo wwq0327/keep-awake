@@ -1,0 +1,51 @@
+# keep-awake
+
+## 目标
+
+macOS 菜单栏（右上角状态栏）常驻小工具：一键切换「保持唤醒」——**允许锁屏和熄屏，阻止因没有键鼠操作而触发的系统闲置休眠**。不承诺阻止手动睡眠、合盖或低电量等强制休眠。全局热键 `⌃⌥⌘K` 按一次开、再按一次关；菜单栏图标用颜色和形态区分状态；统计本次／上次与累计保持唤醒时长。
+
+## 为什么用 Swift 而不是 TypeScript（例外条款）
+
+本项目深度依赖 macOS 系统级 API，TS 生态覆盖不了或代价过高：
+
+- **IOKit** `IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep)`：精确控制「防闲置休眠但不禁锁屏」，Electron/Tauri 都要再包一层原生代码
+- **Carbon** `RegisterEventHotKey`：全局热键，无需辅助功能授权即可跨应用生效
+- **NSStatusItem**：菜单栏常驻图标，Electron tray 常驻内存 100MB+
+
+依据 `~/codes/AGENTS.md`「Python（仅例外路径）」同精神的例外条款，本项目走原生 Swift。
+
+## 技术栈
+
+- Swift 6 + SwiftPM（macOS 13+，arm64）
+- AppKit（菜单栏 status item、NSPopover）
+- SwiftUI（弹出面板 UI）
+- IOKit（电源断言）、Carbon（全局热键）、CoreGraphics（闲置检测）
+
+## 启动方式
+
+- 开发运行：`swift run keep-awake`
+- 启动即保持：`swift run keep-awake --keep-awake-on`（也可写进登录项做开机自启+自动保持）
+- 验证：`swift build` 编译通过（零 warning）
+- 回归测试：`sh scripts/test.sh`。脚本兼容仅安装 Command Line Tools 的环境；该环境随附的 Swift Testing 需要 macOS 14+，仅测试构建使用此部署目标，应用仍支持 macOS 13+。
+- UI 自检钩子（无需屏幕录制权限）：
+  - `swift run keep-awake --render-preview /tmp/ka-preview.png` — 把面板渲染成 PNG 自查布局
+  - `swift run keep-awake --demo-popover` — 打开弹窗并打印锚点几何（stdout，需 fflush），核对：popover 顶边 ≈ 图标底边、图标中心 x 落在弹窗 x 范围内
+- 手动功能验证：
+  1. 运行后菜单栏出现绿色或灰色圆底、白色环形轮廓闪电，按 `⌃⌥⌘K` 图标变为橙黄色圆底、白色环形实心闪电 → `pmset -g assertions | grep keep-awake` 能看到本进程断言
+  2. 再按 `⌃⌥⌘K` 本进程断言消失，图标回到绿色或灰色圆底、白色环形轮廓闪电；只解除本工具的防休眠限制，不强制系统休眠
+  3. 点击图标面板显示「本次保持 / 累计保持 / 程序已运行」三个时长，开启期间逐秒走动；关闭后本次改称上次并冻结数值
+  4. 保持状态下锁屏过夜，机器不休眠（`pmset -g log | grep -i sleep` 无 idle sleep）
+  5. 同时启动第二个进程，应提示已在运行并退出；第二次传入 `--keep-awake-on` 也不会改变现有进程的开关
+  6. 快捷键冲突、开启／停止失败、统计读写失败均应显示提示；统计写失败不停止保持，并在后续定期保存时重试
+
+## 行为约定
+
+- 安全默认：程序退出后系统释放本进程电源断言；每次启动默认「非保持」。只有显式传入 `--keep-awake-on` 才自动开启；没有内置登录项配置功能
+- 单实例锁位于 `~/Library/Application Support/keep-awake/instance.lock`，先获得锁再读取统计或注册快捷键；锁文件不删除，进程退出由系统释放锁
+- 累计时长持久化到 `~/Library/Application Support/keep-awake/stats.json`，保持开启期间每经过 60 秒清醒运行时间，在下一个计时回调中原子保存；停止或正常退出时结算。异常退出可能丢失上次成功保存之后的时长
+- 程序与保持时长使用 `CLOCK_UPTIME_RAW`，不受系统日期调整影响，不计系统实际休眠时间；锁屏和熄屏不暂停统计，强制休眠后唤醒继续保持原开关
+- 已有累计记录原样保留；新的计时口径仅适用于修改后的会话，不追溯修正历史累计值
+- 统计读取失败时保留原文件并禁止覆盖；当前进程仍可保持和计时。写入失败时保留内存累计值并定期重试，退出前仍未保存则显示提示
+- 图标使用方案 C 的圆形反色版，18 × 18 pt 矢量绘制：实心圆底、白色环形闪电，白标缩放至原画板的 79%。橙黄色圆底＋实心白闪电 = 保持唤醒中；绿色圆底＋轮廓白闪电 = 非保持且最近 120 秒有键鼠输入；灰色圆底＋轮廓白闪电 = 非保持且闲置。绿色不表示防休眠已开启
+- 面板使用方案 A「原生轻面板」，固定 320 × 296 pt；状态旁开关控制保持，按本次／上次、累计、程序运行排序展示时长。底部保留错误滚动区、「查看全部」及说明入口，浅深色随系统适配
+- `--render-preview` 只渲染面板，不注册快捷键或开启防休眠；原生控件通过 AppKit 截图，面板固定大小，避免展示后缩放导致锚点漂移
