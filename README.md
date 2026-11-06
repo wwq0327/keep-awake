@@ -55,4 +55,4 @@ swift run keep-awake --demo-popover
 
 ## 许可证
 
-本仓库暂未指定开源许可证；如需使用或再分发，请先联系仓库所有者。
+本项目以 [MIT 许可证](LICENSE)开源。
