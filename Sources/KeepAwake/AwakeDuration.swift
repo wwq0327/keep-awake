@@ -2,6 +2,16 @@ import Foundation
 
 /// Shared numeric boundary for stored durations and their presentation.
 enum AwakeDuration {
+    static func timerMinutes(_ text: String) -> Int? {
+        let parts = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2, (1...2).contains(parts[0].count), parts[1].count == 2,
+              parts.allSatisfy({ $0.utf8.allSatisfy { (48...57).contains($0) } }),
+              let hours = Int(parts[0]), let minutes = Int(parts[1]), minutes < 60 else { return nil }
+        let total = hours * 60 + minutes
+        return (1...1440).contains(total) ? total : nil
+    }
+
     static func isSupported(_ seconds: TimeInterval) -> Bool {
         wholeSeconds(seconds) != nil
     }

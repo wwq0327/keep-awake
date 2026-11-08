@@ -15,6 +15,9 @@ final class AppState: ObservableObject {
     @Published private(set) var hotKeyError: String?
     @Published private(set) var statsError: String?
     @Published private(set) var displayState: DisplayState = .idle
+    @Published private(set) var usesTimer = false
+    @Published private(set) var durationMinutes = 120
+    @Published var durationDraft: String?
 
     var onStateChange: ((DisplayState) -> Void)?
     var onError: (() -> Void)?
@@ -93,7 +96,32 @@ final class AppState: ObservableObject {
 
     func toggleKeepAwake() {
         guard !preparedToQuit else { return }
-        if isKeepingAwake { stopKeepAwake() } else { startKeepAwake() }
+        if isKeepingAwake {
+            stopKeepAwake()
+        } else if commitDurationEdit() {
+            startKeepAwake()
+        }
+    }
+
+    func selectTimer(_ timed: Bool) {
+        guard !isKeepingAwake, !preparedToQuit else { return }
+        if !timed { durationDraft = nil }
+        usesTimer = timed
+    }
+
+    func beginDurationEdit() {
+        guard !isKeepingAwake, !preparedToQuit else { return }
+        usesTimer = true
+        durationDraft = String(format: "%02d:%02d", durationMinutes / 60, durationMinutes % 60)
+    }
+
+    @discardableResult
+    func commitDurationEdit() -> Bool {
+        guard let durationDraft else { return true }
+        guard let minutes = AwakeDuration.timerMinutes(durationDraft) else { return false }
+        durationMinutes = minutes
+        self.durationDraft = nil
+        return true
     }
 
     /// Recover from a shortcut conflict without restarting the running session.
@@ -118,13 +146,16 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func stopKeepAwake() {
+    private func stopKeepAwake(reportRepeatedError: Bool = true) {
         do {
             try power.stopKeepingAwake()
         } catch {
             // Leave the switch ON if the assertion could not be released.
-            powerError = error.localizedDescription
-            onError?()
+            let message = error.localizedDescription
+            if reportRepeatedError || powerError != message {
+                powerError = message
+                onError?()
+            }
             return
         }
         let time = clock()
@@ -161,6 +192,11 @@ final class AppState: ObservableObject {
         return lastSessionSeconds
     }
 
+    var countdownSeconds: TimeInterval? {
+        guard isKeepingAwake, usesTimer else { return nil }
+        return max(0, TimeInterval(durationMinutes * 60) - sessionSeconds)
+    }
+
     var totalAwakeSeconds: TimeInterval {
         stats.cumulativeAwakeSeconds + (sessionStart == nil ? 0 : sessionSeconds)
     }
@@ -168,7 +204,11 @@ final class AppState: ObservableObject {
     /// Internal for deterministic regression tests; production uses the timer.
     func tick() {
         now = clock()
-        notifyStateChange()
+        if countdownSeconds == 0 {
+            stopKeepAwake(reportRepeatedError: false)
+        } else {
+            notifyStateChange()
+        }
         // Check elapsed time, not a particular wall-clock second. Failed saves
         // retry after 60 awake seconds, including while the switch is OFF.
         if (isKeepingAwake || stats.hasUnsavedChanges), now - lastSnapshotTime >= 60 {

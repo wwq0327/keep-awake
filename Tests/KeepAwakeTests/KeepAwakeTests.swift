@@ -87,6 +87,87 @@ private struct Fixture {
 @Suite(.serialized)
 @MainActor
 struct AppStateTests {
+    @Test func selectedTimerExpiresAndCommitsOnce() throws {
+        let f = try Fixture()
+        #expect(!f.model.usesTimer)
+        #expect(f.model.durationMinutes == 120)
+        f.model.selectTimer(true)
+        #expect(!f.model.isKeepingAwake)
+        f.model.beginDurationEdit()
+        f.model.durationDraft = "00:01"
+        f.model.toggleKeepAwake()
+        #expect(f.model.countdownSeconds == 60)
+        #expect(f.model.durationDraft == nil)
+        f.clock.seconds += 59.5
+        f.model.tick()
+        #expect(f.power.active)
+        #expect(f.model.countdownSeconds == 0.5)
+        f.clock.seconds += 0.5
+        f.model.tick()
+        #expect(!f.power.active)
+        #expect(f.model.countdownSeconds == nil)
+        #expect(f.model.sessionSeconds == 60)
+        f.clock.seconds += 10
+        f.model.tick()
+        #expect(f.power.stops == 1)
+        #expect(StatsStore(fileURL: f.scratch.statsURL).cumulativeAwakeSeconds == 60)
+    }
+
+    @Test func invalidEditBlocksStartAndUnlimitedHasNoDeadline() throws {
+        let f = try Fixture()
+        f.model.beginDurationEdit()
+        f.model.durationDraft = "01:60"
+        f.hotKey.onToggle?()
+        #expect(f.power.starts == 0)
+        #expect(f.model.durationDraft == "01:60")
+        #expect(f.model.durationMinutes == 120)
+        f.model.selectTimer(false)
+        f.model.toggleKeepAwake()
+        f.clock.seconds += 7201
+        f.model.tick()
+        #expect(f.model.isKeepingAwake)
+        #expect(f.model.countdownSeconds == nil)
+        f.model.prepareToQuit()
+    }
+
+    @Test func timerRetriesFailedReleaseAndKeepsStateHonest() throws {
+        let f = try Fixture()
+        var notices = 0
+        f.model.onError = { notices += 1 }
+        f.model.beginDurationEdit()
+        f.model.durationDraft = "00:01"
+        f.model.toggleKeepAwake()
+        f.power.stopFails = true
+        f.clock.seconds += 60
+        f.model.tick()
+        #expect(f.model.isKeepingAwake)
+        #expect(f.model.countdownSeconds == 0)
+        #expect(f.model.powerError != nil)
+        f.clock.seconds += 1
+        f.model.tick()
+        #expect(notices == 1)
+        f.power.stopFails = false
+        f.clock.seconds += 1
+        f.model.tick()
+        #expect(!f.model.isKeepingAwake)
+        #expect(f.model.powerError == nil)
+        #expect(StatsStore(fileURL: f.scratch.statsURL).cumulativeAwakeSeconds == 62)
+    }
+
+    @Test func earlyStopCancelsTimedSession() throws {
+        let f = try Fixture()
+        f.model.selectTimer(true)
+        f.model.toggleKeepAwake()
+        f.clock.seconds += 25
+        f.model.toggleKeepAwake()
+        f.clock.seconds += 7200
+        f.model.tick()
+        #expect(f.power.stops == 1)
+        #expect(f.model.countdownSeconds == nil)
+        #expect(f.model.sessionSeconds == 25)
+        #expect(f.store.cumulativeAwakeSeconds == 25)
+    }
+
     @Test func activityBoundaryIsSampledOncePerTick() throws {
         let f = try Fixture()
         var states: [DisplayState] = []
@@ -374,6 +455,13 @@ struct AppStateTests {
         }
         try render("panel-off")
         try render("panel-off-dark", appearance: .darkAqua)
+        f.model.beginDurationEdit()
+        try render("panel-timer-edit")
+        f.model.durationDraft = "02:00"
+        f.model.toggleKeepAwake()
+        try render("panel-timer-running")
+        f.model.toggleKeepAwake()
+        f.model.selectTimer(false)
         f.model.toggleKeepAwake()
         f.clock.seconds += 3661
         f.model.tick()
@@ -418,6 +506,15 @@ struct AppStateTests {
             let png = try #require(bitmap.representation(using: .png, properties: [:]))
             try png.write(to: output.appendingPathComponent("icon-\(name).png"))
         }
+    }
+}
+
+@Test func countdownDurationAcceptsOnlySupportedHoursAndMinutes() {
+    #expect(AwakeDuration.timerMinutes("00:01") == 1)
+    #expect(AwakeDuration.timerMinutes("1:30") == 90)
+    #expect(AwakeDuration.timerMinutes("24:00") == 1440)
+    for text in ["", "00:00", "01:60", "24:01", "25:00", "1:5", "-1:30", "2h", "01:30:00"] {
+        #expect(AwakeDuration.timerMinutes(text) == nil)
     }
 }
 

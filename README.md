@@ -13,6 +13,7 @@ Keep Awake is a macOS menu bar utility that prevents idle system sleep while all
 ### Features
 
 - Toggle keep-awake from the menu bar panel or with the global shortcut `⌃⌥⌘K` (Control + Option + Command + K).
+- Click the duration (initially **2 h**) to select a timer, or double-click it to edit in `HH:MM` format from `00:01` through `24:00`. Use the switch or shortcut to start. When the countdown ends, the Mac returns to its normal sleep settings. Choose **Unlimited** for an open-ended session.
 - An orange filled bolt means keep-awake is on. A green outlined bolt means it is off and there has been keyboard or mouse input in the last 120 seconds; gray means it is off and idle. Green does not mean sleep prevention is on.
 - View the current or last session, total keep-awake time, and app uptime. The menu bar also shows the current session duration while enabled.
 - Only one instance runs at a time. The panel reports hotkey registration, power assertion, and statistics read/write errors.
@@ -81,6 +82,7 @@ Built with Swift, SwiftUI, AppKit, IOKit, and Carbon. An IOKit power assertion p
 ### 功能
 
 - 点击菜单栏图标，在面板中切换保持唤醒；也可使用全局快捷键 `⌃⌥⌘K`（Control + Option + Command + K）。
+- 单击时长（初始为「2 小时」）选中限时模式，双击可在原位按 `小时:分钟` 修改，范围为 `00:01` 到 `24:00`。用开关或快捷键启动，到点恢复按系统设置休眠。选「不限时」可持续保持。
 - 橙黄色实心闪电表示保持唤醒已开启；绿色轮廓表示未开启且最近 120 秒有键鼠操作；灰色轮廓表示未开启且处于闲置状态。绿色不代表防休眠已开启。
 - 显示本次或上次保持时长、累计保持时长和程序运行时长；开启期间菜单栏还会显示本次时长。
 - 单实例运行；快捷键注册、系统断言或统计读写出错时在面板中提示。
